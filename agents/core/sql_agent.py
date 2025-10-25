@@ -13,6 +13,7 @@ from datetime import datetime
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser, PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
+from langsmith import traceable
 import json
 
 from agents.core.schema_agent import SchemaAwarenessAgent
@@ -62,6 +63,7 @@ class SQLGenerationAgent:
             logger.error(f"Failed to setup SQL Generation LLM: {e}")
             raise
     
+    @traceable(name="sql_generation", project_name="web-activity-agent-system")
     def generate_sql_query(self, question: str, user_id: int, current_date: str = None) -> Optional[str]:
         """Generate SQL query from natural language question.
         

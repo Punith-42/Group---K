@@ -12,6 +12,7 @@ from datetime import datetime
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
+from langsmith import traceable
 
 from agents.core.sql_agent import SQLGenerationAgent
 from agents.core.query_execution_agent import QueryExecutionAgent
@@ -69,6 +70,7 @@ class LLMDatabaseAgent:
             logger.error(f"Failed to setup OpenAI LLM: {e}")
             raise
     
+    @traceable(name="process_question", project_name="web-activity-agent-system")
     def process_question(self, question: str, user_id: int) -> Dict[str, Any]:
         """Process a natural language question using specialized agents.
         
@@ -147,6 +149,7 @@ class LLMDatabaseAgent:
                 )
             }
     
+    @traceable(name="generate_sql_query", project_name="web-activity-agent-system")
     def _generate_sql_query(self, question: str, user_id: int) -> Optional[str]:
         """Generate SQL query from natural language question using specialized SQL agent."""
         try:
