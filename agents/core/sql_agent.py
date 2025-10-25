@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class SQLGenerationAgent:
     """Specialized agent for SQL query generation from natural language."""
     
-    def __init__(self, gemini_api_key: str, model_name: str = "gemini-2.0-flash"):
+    def __init__(self, gemini_api_key: str, model_name: str = "models/gemini-2.5-pro"):
         """Initialize the SQL generation agent.
         
         Args:
@@ -208,31 +208,35 @@ Generate the SQL query:"""
         if not response_text:
             return None
         
-        # Try to find SQL query in various formats
-        lines = response_text.split('\n')
-        sql_query = None
+        # First, try to extract from code blocks
+        import re
         
+        # Look for SQL in code blocks
+        sql_block_match = re.search(r'```sql\s*(.*?)\s*```', response_text, re.DOTALL | re.IGNORECASE)
+        if sql_block_match:
+            sql_query = sql_block_match.group(1).strip()
+            return self._clean_sql_response(sql_query)
+        
+        # Look for any code block with SELECT
+        code_block_match = re.search(r'```\s*(.*?SELECT.*?)\s*```', response_text, re.DOTALL | re.IGNORECASE)
+        if code_block_match:
+            sql_query = code_block_match.group(1).strip()
+            return self._clean_sql_response(sql_query)
+        
+        # If no code blocks, look for SELECT statement spanning multiple lines
+        select_match = re.search(r'SELECT.*?(?=\n\n|\n$|$)', response_text, re.DOTALL | re.IGNORECASE)
+        if select_match:
+            sql_query = select_match.group(0).strip()
+            return self._clean_sql_response(sql_query)
+        
+        # Fallback: look for any line starting with SELECT
+        lines = response_text.split('\n')
         for line in lines:
             line = line.strip()
-            # Look for lines that start with SELECT
             if line.upper().startswith('SELECT'):
-                sql_query = line
-                break
-            # Look for lines in code blocks
-            elif '```' in line and 'SELECT' in line.upper():
-                # Extract SQL from code block
-                sql_query = line.replace('```sql', '').replace('```', '').strip()
-                break
+                return self._clean_sql_response(line)
         
-        # If no SELECT found, try to extract from the entire response
-        if not sql_query:
-            # Look for SELECT anywhere in the response
-            import re
-            select_match = re.search(r'SELECT.*?(?=\n\n|\n$|$)', response_text, re.DOTALL | re.IGNORECASE)
-            if select_match:
-                sql_query = select_match.group(0).strip()
-        
-        return self._clean_sql_response(sql_query) if sql_query else None
+        return None
     
     def _create_sql_prompt(self, question: str, user_id: int, current_date: str, schema_info: str) -> str:
         """Create a direct SQL generation prompt for Gemini."""

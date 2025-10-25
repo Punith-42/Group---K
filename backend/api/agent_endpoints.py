@@ -17,7 +17,7 @@ agent_bp = Blueprint('agent', __name__, url_prefix='/api/agent')
 # Global agent instance (will be initialized in main.py)
 agent_instance = None
 
-def init_agent(gemini_api_key: str, model_name: str = "gemini-2.0-flash"):
+def init_agent(gemini_api_key: str, model_name: str = "models/gemini-2.5-pro"):
     """Initialize the global agent instance.
     
     Args:
