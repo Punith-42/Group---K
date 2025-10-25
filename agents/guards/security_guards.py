@@ -30,11 +30,11 @@ class QuerySecurityGuard:
         # Dangerous SQL keywords to block
         self.dangerous_keywords = [
             'DROP', 'DELETE', 'UPDATE', 'INSERT', 'ALTER', 'CREATE',
-            'TRUNCATE', 'EXEC', 'EXECUTE', 'UNION', 'INFORMATION_SCHEMA',
+            'TRUNCATE', 'EXEC', 'EXECUTE', 'INFORMATION_SCHEMA',
             'SYSTEM', 'ADMIN', 'GRANT', 'REVOKE', 'SHUTDOWN'
         ]
         
-        # Allowed SQL keywords
+        # Allowed SQL keywords (including UNION for multi-table queries)
         self.allowed_keywords = [
             'SELECT', 'FROM', 'WHERE', 'ORDER', 'BY', 'GROUP', 'HAVING',
             'LIMIT', 'OFFSET', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'OUTER',
@@ -42,7 +42,8 @@ class QuerySecurityGuard:
             'IS', 'NULL', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'DISTINCT',
             'DATE', 'CURDATE', 'NOW', 'INTERVAL', 'WEEK', 'MONTH', 'YEAR',
             'DATE_SUB', 'DATE_FORMAT', 'DESC', 'ASC', 'TOTAL', 'TIME',
-            'SOCIAL', 'MEDIA', 'BROWSE', 'ACTIVITY', 'REPOSITORY', 'COMMIT'
+            'SOCIAL', 'MEDIA', 'BROWSE', 'ACTIVITY', 'REPOSITORY', 'COMMIT',
+            'UNION', 'UNION ALL'  # Allow UNION operations for multi-table queries
         ]
         
         logger.info(f"QuerySecurityGuard initialized with {security_level.value} security level")
@@ -80,6 +81,12 @@ class QuerySecurityGuard:
             # Check for system table access
             if self._check_system_table_access(sql_upper):
                 return False, "System table access not allowed"
+            
+            # Check UNION query safety
+            if 'UNION' in sql_upper:
+                union_safe, union_reason = self._check_union_safety(sql_query, user_id)
+                if not union_safe:
+                    return False, f"UNION query safety check failed: {union_reason}"
             
             # Additional checks based on security level
             if self.security_level == SecurityLevel.HIGH:
@@ -148,6 +155,58 @@ class QuerySecurityGuard:
                 return True
         
         return False
+    
+    def _check_union_safety(self, sql_query: str, user_id: int) -> Tuple[bool, str]:
+        """Check UNION query safety.
+        
+        Args:
+            sql_query: SQL query containing UNION
+            user_id: User ID for validation
+            
+        Returns:
+            Tuple of (is_safe, reason)
+        """
+        try:
+            sql_lower = sql_query.lower()
+            
+            # Split query by UNION to check each part
+            union_parts = re.split(r'\bunion\b', sql_lower)
+            
+            if len(union_parts) < 2:
+                return False, "UNION query must have at least two SELECT statements"
+            
+            # Check each SELECT statement in the UNION
+            for i, part in enumerate(union_parts):
+                part = part.strip()
+                if not part:
+                    continue
+                
+                # Remove ORDER BY clause from the end for validation
+                part_without_order = re.sub(r'\s+order\s+by\s+.*$', '', part, flags=re.IGNORECASE)
+                    
+                # Each part should be a SELECT statement
+                if not part_without_order.startswith('select'):
+                    return False, f"UNION part {i+1} must start with SELECT"
+                
+                # Each part must have user_id filtering
+                if not self._check_user_id_filtering(part_without_order, user_id):
+                    return False, f"UNION part {i+1} must include user_id filtering"
+                
+                # Check for dangerous keywords in each part
+                part_upper = part_without_order.upper()
+                dangerous_found = self._check_dangerous_keywords(part_upper)
+                if dangerous_found:
+                    return False, f"Dangerous keyword '{dangerous_found}' found in UNION part {i+1}"
+            
+            # Check that UNION is not used with subqueries that could be exploited
+            if 'select' in sql_lower and sql_lower.count('select') > len(union_parts):
+                return False, "UNION queries with nested SELECT statements are not allowed"
+            
+            return True, "UNION query is safe"
+            
+        except Exception as e:
+            logger.error(f"Error checking UNION safety: {e}")
+            return False, f"UNION safety check error: {str(e)}"
     
     def _check_allowed_keywords_only(self, sql_upper: str) -> bool:
         """Check if query contains only allowed keywords (HIGH security)."""

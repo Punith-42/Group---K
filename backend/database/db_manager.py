@@ -213,5 +213,21 @@ class DatabaseManager:
             {
                 "question": "Show my commits for the past 5 days",
                 "sql": "SELECT * FROM github_activity WHERE user_id = %s AND activity_type = 'commit' AND activity_date >= DATE_SUB(CURDATE(), INTERVAL 5 DAY) ORDER BY activity_date DESC"
+            },
+            {
+                "question": "Show all my activity from both web and GitHub today",
+                "sql": "SELECT 'web' as platform, website_name as source, time_spent, activity_date FROM web_activity WHERE user_id = %s AND activity_date = CURDATE() UNION ALL SELECT 'github' as platform, repository_name as source, 0 as time_spent, activity_date FROM github_activity WHERE user_id = %s AND activity_date = CURDATE() ORDER BY activity_date DESC"
+            },
+            {
+                "question": "What are my most active platforms overall?",
+                "sql": "SELECT 'web' as platform, COUNT(*) as activity_count FROM web_activity WHERE user_id = %s GROUP BY 'web' UNION ALL SELECT 'github' as platform, COUNT(*) as activity_count FROM github_activity WHERE user_id = %s GROUP BY 'github' ORDER BY activity_count DESC"
+            },
+            {
+                "question": "Show my total time spent across all platforms this week",
+                "sql": "SELECT 'web' as platform, SUM(time_spent) as total_time FROM web_activity WHERE user_id = %s AND activity_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) GROUP BY 'web' UNION ALL SELECT 'github' as platform, COUNT(*) * 5 as total_time FROM github_activity WHERE user_id = %s AND activity_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) GROUP BY 'github'"
+            },
+            {
+                "question": "Show all my repositories and websites I have been active on",
+                "sql": "SELECT DISTINCT repository_name as name, 'repository' as type FROM github_activity WHERE user_id = %s AND repository_name IS NOT NULL UNION ALL SELECT DISTINCT website_name as name, 'website' as type FROM web_activity WHERE user_id = %s AND website_name IS NOT NULL ORDER BY name"
             }
         ]

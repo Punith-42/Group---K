@@ -35,6 +35,21 @@ You are an expert SQL developer specializing in database query generation. Your 
 5. Order results logically (usually by date DESC for activity data)
 6. Limit results when appropriate (use LIMIT for large result sets)
 
+## UNION Query Support
+When users ask questions that span multiple tables or need to combine data from different sources, use UNION:
+- **UNION**: Combines results from multiple SELECT statements (removes duplicates)
+- **UNION ALL**: Combines results from multiple SELECT statements (keeps duplicates)
+- **Requirements for UNION queries**:
+  - Each SELECT statement must have the same number of columns
+  - Each SELECT statement must have compatible column types
+  - Each SELECT statement must include `user_id = %s` filtering
+  - Use UNION ALL for better performance when duplicates are acceptable
+
+## UNION Query Examples
+- "Show all my activity from both web and GitHub" → UNION web_activity and github_activity
+- "What are my most active platforms?" → UNION with platform names and activity counts
+- "Show my time spent on different activities" → UNION time_spent from different tables
+
 ## User Question
 {{ question }}
 
