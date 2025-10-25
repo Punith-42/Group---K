@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class LLMDatabaseAgent:
     """LLM-powered database agent for natural language queries."""
     
-    def __init__(self, gemini_api_key: str, model_name: str = "gemini-2.0-flash"):
+    def __init__(self, gemini_api_key: str, model_name: str = "models/gemini-2.5-pro"):
         """Initialize the LLM database agent with specialized agents.
         
         Args:

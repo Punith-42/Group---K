@@ -153,8 +153,8 @@ async def startup_event():
             logger.error("GEMINI_API_KEY not found in environment variables")
             return
         
-        # Get model name
-        model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    # Get model name
+    model_name = os.getenv("GEMINI_MODEL", "models/gemini-2.5-pro")
         
         # Initialize LangSmith tracing
         langsmith_client = setup_langsmith_tracing()

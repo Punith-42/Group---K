@@ -36,8 +36,8 @@ def setup_agent():
             logger.error("GEMINI_API_KEY not found in environment variables")
             return False
         
-        # Get model name (optional, defaults to gemini-1.5-flash)
-        model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        # Get model name (optional, defaults to models/gemini-2.5-pro)
+        model_name = os.getenv("GEMINI_MODEL", "models/gemini-2.5-pro")
         
         # Initialize LangSmith tracing
         langsmith_client = setup_langsmith_tracing()
