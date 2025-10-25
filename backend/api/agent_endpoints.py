@@ -17,16 +17,16 @@ agent_bp = Blueprint('agent', __name__, url_prefix='/api/agent')
 # Global agent instance (will be initialized in main.py)
 agent_instance = None
 
-def init_agent(openai_api_key: str, model_name: str = "gpt-3.5-turbo"):
+def init_agent(gemini_api_key: str, model_name: str = "gemini-2.0-flash"):
     """Initialize the global agent instance.
     
     Args:
-        openai_api_key: OpenAI API key
-        model_name: OpenAI model name
+        gemini_api_key: Google Gemini API key
+        model_name: Gemini model name
     """
     global agent_instance
     try:
-        agent_instance = LLMDatabaseAgent(openai_api_key, model_name)
+        agent_instance = LLMDatabaseAgent(gemini_api_key, model_name)
         logger.info("Agent initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize agent: {e}")

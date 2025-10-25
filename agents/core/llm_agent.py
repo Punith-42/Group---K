@@ -9,7 +9,7 @@ import logging
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langsmith import traceable
@@ -26,21 +26,21 @@ logger = logging.getLogger(__name__)
 class LLMDatabaseAgent:
     """LLM-powered database agent for natural language queries."""
     
-    def __init__(self, openai_api_key: str, model_name: str = "gpt-3.5-turbo"):
+    def __init__(self, gemini_api_key: str, model_name: str = "gemini-2.0-flash"):
         """Initialize the LLM database agent with specialized agents.
         
         Args:
-            openai_api_key: OpenAI API key
-            model_name: OpenAI model name
+            gemini_api_key: Google Gemini API key
+            model_name: Gemini model name
         """
-        self.openai_api_key = openai_api_key
+        self.gemini_api_key = gemini_api_key
         self.model_name = model_name
         
         # Initialize specialized agents
         self.schema_agent = SchemaAwarenessAgent()
-        self.sql_agent = SQLGenerationAgent(openai_api_key, model_name)
+        self.sql_agent = SQLGenerationAgent(gemini_api_key, model_name)
         self.query_execution_agent = QueryExecutionAgent()
-        self.response_formatting_agent = ResponseFormattingAgent(openai_api_key, model_name)
+        self.response_formatting_agent = ResponseFormattingAgent(gemini_api_key, model_name)
         
         # Initialize security guards
         self.query_guard = QuerySecurityGuard()
@@ -53,21 +53,22 @@ class LLMDatabaseAgent:
         logger.info("Specialized agents: Schema, SQL Generation, Query Execution, Response Formatting")
     
     def _setup_llm(self):
-        """Setup the OpenAI LLM."""
+        """Setup the Google Gemini LLM."""
         try:
-            if not self.openai_api_key:
-                raise ValueError("OpenAI API key is required")
+            if not self.gemini_api_key:
+                raise ValueError("Gemini API key is required")
             
-            self.model = ChatOpenAI(
-                api_key=self.openai_api_key,
-                model_name=self.model_name,
-                temperature=0.1  # Low temperature for consistent SQL generation
+            self.model = ChatGoogleGenerativeAI(
+                model=self.model_name,
+                google_api_key=self.gemini_api_key,
+                temperature=0.1,  # Low temperature for consistent SQL generation
+                convert_system_message_to_human=True
             )
             self.parser = StrOutputParser()
             
-            logger.info("OpenAI LLM setup completed successfully")
+            logger.info("Google Gemini LLM setup completed successfully")
         except Exception as e:
-            logger.error(f"Failed to setup OpenAI LLM: {e}")
+            logger.error(f"Failed to setup Google Gemini LLM: {e}")
             raise
     
     @traceable(name="process_question", project_name="web-activity-agent-system")

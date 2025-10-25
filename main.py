@@ -28,22 +28,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def setup_agent():
-    """Setup the LLM agent with OpenAI integration."""
+    """Setup the LLM agent with Google Gemini integration."""
     try:
-        # Get OpenAI API key from environment
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        if not openai_api_key:
-            logger.error("OPENAI_API_KEY not found in environment variables")
+        # Get Gemini API key from environment
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if not gemini_api_key:
+            logger.error("GEMINI_API_KEY not found in environment variables")
             return False
         
-        # Get model name (optional, defaults to gpt-3.5-turbo)
-        model_name = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+        # Get model name (optional, defaults to gemini-1.5-flash)
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
         
         # Initialize LangSmith tracing
         langsmith_client = setup_langsmith_tracing()
         
         # Initialize agent
-        init_agent(openai_api_key, model_name)
+        init_agent(gemini_api_key, model_name)
         
         logger.info(f"LLM Agent initialized with model: {model_name}")
         return True
