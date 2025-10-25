@@ -10,7 +10,7 @@ import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import StrOutputParser, PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 from langsmith import traceable
@@ -25,14 +25,14 @@ logger = logging.getLogger(__name__)
 class SQLGenerationAgent:
     """Specialized agent for SQL query generation from natural language."""
     
-    def __init__(self, openai_api_key: str, model_name: str = "gpt-3.5-turbo"):
+    def __init__(self, gemini_api_key: str, model_name: str = "gemini-2.0-flash"):
         """Initialize the SQL generation agent.
         
         Args:
-            openai_api_key: OpenAI API key
-            model_name: OpenAI model name
+            gemini_api_key: Google Gemini API key
+            model_name: Gemini model name
         """
-        self.openai_api_key = openai_api_key
+        self.gemini_api_key = gemini_api_key
         self.model_name = model_name
         
         # Initialize components
@@ -45,16 +45,16 @@ class SQLGenerationAgent:
         logger.info(f"SQLGenerationAgent initialized with model: {model_name}")
     
     def _setup_llm(self):
-        """Setup the OpenAI LLM for SQL generation."""
+        """Setup the Google Gemini LLM for SQL generation."""
         try:
-            if not self.openai_api_key:
-                raise ValueError("OpenAI API key is required")
+            if not self.gemini_api_key:
+                raise ValueError("Gemini API key is required")
             
-            self.model = ChatOpenAI(
-                api_key=self.openai_api_key,
-                model_name=self.model_name,
+            self.model = ChatGoogleGenerativeAI(
+                model=self.model_name,
+                google_api_key=self.gemini_api_key,
                 temperature=0.0,  # Zero temperature for consistent SQL generation
-                response_format={"type": "json_object"}  # Enable JSON mode
+                convert_system_message_to_human=True
             )
             self.parser = PydanticOutputParser(pydantic_object=SQLQueryResponse)
             
@@ -84,24 +84,28 @@ class SQLGenerationAgent:
             # Get database schema information (force refresh to get latest sample values)
             schema_info = self.schema_agent.format_schema_for_llm()
             
-            # Create comprehensive prompt for SQL generation with JSON format
-            prompt_text = self._create_json_sql_prompt(question, user_id, current_date, schema_info)
+            # Create comprehensive prompt for SQL generation
+            prompt_text = self._create_sql_prompt(question, user_id, current_date, schema_info)
             
-            # Generate SQL query using JSON mode
+            # Generate SQL query using Gemini
             response = self.model.invoke(prompt_text)
             
-            # Parse JSON response
+            # Parse response (Gemini returns text, not JSON)
             try:
-                json_response = json.loads(response.content)
-                sql_query = json_response.get("sql_query", "")
-                reasoning = json_response.get("reasoning", "")
-                confidence = json_response.get("confidence", 0.0)
+                response_text = response.content.strip()
+                logger.info(f"Raw Gemini response: {response_text}")
                 
-                logger.info(f"SQL generated with confidence {confidence}: {sql_query}")
-                logger.info(f"Reasoning: {reasoning}")
+                # Try to extract SQL query from the response
+                sql_query = self._extract_sql_from_response(response_text)
                 
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON response: {e}")
+                if not sql_query:
+                    logger.error("No SQL query found in response")
+                    return None
+                
+                logger.info(f"SQL generated: {sql_query}")
+                
+            except Exception as e:
+                logger.error(f"Failed to parse response: {e}")
                 return None
             
             # Post-process to ensure %s placeholder is used
@@ -199,6 +203,61 @@ You must respond with a valid JSON object containing:
 
 Generate the SQL query:"""
     
+    def _extract_sql_from_response(self, response_text: str) -> Optional[str]:
+        """Extract SQL query from Gemini's text response."""
+        if not response_text:
+            return None
+        
+        # Try to find SQL query in various formats
+        lines = response_text.split('\n')
+        sql_query = None
+        
+        for line in lines:
+            line = line.strip()
+            # Look for lines that start with SELECT
+            if line.upper().startswith('SELECT'):
+                sql_query = line
+                break
+            # Look for lines in code blocks
+            elif '```' in line and 'SELECT' in line.upper():
+                # Extract SQL from code block
+                sql_query = line.replace('```sql', '').replace('```', '').strip()
+                break
+        
+        # If no SELECT found, try to extract from the entire response
+        if not sql_query:
+            # Look for SELECT anywhere in the response
+            import re
+            select_match = re.search(r'SELECT.*?(?=\n\n|\n$|$)', response_text, re.DOTALL | re.IGNORECASE)
+            if select_match:
+                sql_query = select_match.group(0).strip()
+        
+        return self._clean_sql_response(sql_query) if sql_query else None
+    
+    def _create_sql_prompt(self, question: str, user_id: int, current_date: str, schema_info: str) -> str:
+        """Create a direct SQL generation prompt for Gemini."""
+        return f"""You are an expert SQL developer. Generate a SQL query for the following question.
+
+DATABASE SCHEMA:
+{schema_info}
+
+QUESTION: {question}
+CURRENT DATE: {current_date}
+USER ID: {user_id}
+
+CRITICAL REQUIREMENTS:
+1. ALWAYS include "user_id = %s" in WHERE clause for security
+2. ONLY use SELECT queries - no INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE
+3. Use proper MySQL syntax
+4. Use parameterized queries with %s for user_id placeholder
+5. For date-related queries, use proper date functions
+
+IMPORTANT: Use Exact Database Values
+- For website names: Use FULL domain names (e.g., 'youtube.com', 'github.com')
+- For activity types: Use exact values (e.g., 'commit', 'pull_request', 'issue')
+
+Generate ONLY the SQL query, nothing else:"""
+
     def _clean_sql_response(self, response: str) -> str:
         """Clean and validate SQL response."""
         if not response:

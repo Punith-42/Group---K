@@ -26,7 +26,7 @@ class Config:
     
     # API configuration
     API_HOST = '127.0.0.1'
-    API_PORT = 5000
+    API_PORT = 5001
     
     @classmethod
     def get_database_config(cls) -> Dict[str, Any]:

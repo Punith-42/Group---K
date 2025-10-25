@@ -147,20 +147,20 @@ async def startup_event():
     try:
         logger.info("Starting Web Activity Tracker with LLM Agent System...")
         
-        # Get OpenAI API key
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        if not openai_api_key:
-            logger.error("OPENAI_API_KEY not found in environment variables")
+        # Get Gemini API key
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if not gemini_api_key:
+            logger.error("GEMINI_API_KEY not found in environment variables")
             return
         
         # Get model name
-        model_name = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
         
         # Initialize LangSmith tracing
         langsmith_client = setup_langsmith_tracing()
         
         # Initialize the agent
-        agent_instance = LLMDatabaseAgent(openai_api_key, model_name)
+        agent_instance = LLMDatabaseAgent(gemini_api_key, model_name)
         
         logger.info("✅ Agent system initialized successfully")
         logger.info(f"📊 Model: {model_name}")

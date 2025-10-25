@@ -5,10 +5,10 @@ Specialized agent for converting query results into natural language responses.
 
 import json
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import StrOutputParser, PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 from langsmith import traceable
@@ -23,14 +23,14 @@ logger = logging.getLogger(__name__)
 class ResponseFormattingAgent:
     """Specialized agent for formatting query results into natural language responses."""
     
-    def __init__(self, openai_api_key: str, model_name: str = "gpt-3.5-turbo"):
+    def __init__(self, gemini_api_key: str, model_name: str = "gemini-2.0-flash"):
         """Initialize the response formatting agent.
         
         Args:
-            openai_api_key: OpenAI API key
-            model_name: OpenAI model name
+            gemini_api_key: Google Gemini API key
+            model_name: Gemini model name
         """
-        self.openai_api_key = openai_api_key
+        self.gemini_api_key = gemini_api_key
         self.model_name = model_name
         
         # Initialize components
@@ -43,16 +43,16 @@ class ResponseFormattingAgent:
         logger.info(f"ResponseFormattingAgent initialized with model: {model_name}")
     
     def _setup_llm(self):
-        """Setup the OpenAI LLM for response formatting."""
+        """Setup the Google Gemini LLM for response formatting."""
         try:
-            if not self.openai_api_key:
-                raise ValueError("OpenAI API key is required")
+            if not self.gemini_api_key:
+                raise ValueError("Gemini API key is required")
             
-            self.model = ChatOpenAI(
-                api_key=self.openai_api_key,
-                model_name=self.model_name,
+            self.model = ChatGoogleGenerativeAI(
+                model=self.model_name,
+                google_api_key=self.gemini_api_key,
                 temperature=0.3,  # Slightly higher temperature for more natural responses
-                response_format={"type": "json_object"}  # Enable JSON mode
+                convert_system_message_to_human=True
             )
             self.parser = PydanticOutputParser(pydantic_object=DataAnalysisResponse)
             
@@ -79,25 +79,25 @@ class ResponseFormattingAgent:
             # Extract relevant information from query results
             results_data = self._extract_results_data(query_results)
             
-            # Create comprehensive prompt for response formatting with JSON
-            prompt_text = self._create_json_response_prompt(question, results_data, sql_query)
+            # Create comprehensive prompt for response formatting
+            prompt_text = self._create_response_prompt(question, results_data, sql_query)
             
-            # Generate formatted response using JSON mode
+            # Generate formatted response using Gemini
             try:
                 response = self.model.invoke(prompt_text)
                 
-                # Parse JSON response
+                # Parse Gemini text response
                 try:
-                    json_response = json.loads(response.content)
-                    formatted_response = json_response.get("response", "")
-                    structured_results = json_response.get("results", [])
-                    summary = json_response.get("summary", {})
-                    metadata = json_response.get("metadata", {})
+                    response_text = response.content.strip()
+                    logger.info(f"Raw Gemini response: {response_text[:200]}...")
+                    
+                    # Extract structured response from text
+                    formatted_response, structured_results, summary, metadata = self._parse_gemini_response(response_text, results_data)
                     
                     logger.info(f"LLM response generated successfully: {formatted_response[:100]}...")
                     
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse JSON response: {e}")
+                except Exception as e:
+                    logger.error(f"Failed to parse Gemini response: {e}")
                     # Fallback to simple response
                     formatted_response = self._create_fallback_aggregation_response(question, results_data)
                     structured_results = results_data.get("data", [])
@@ -441,6 +441,64 @@ Provide a natural, helpful response:"""
             logger.error(f"Error creating fallback response: {e}")
             return "I found some data but couldn't format a proper response."
     
+    def _parse_gemini_response(self, response_text: str, results_data: Dict[str, Any]) -> Tuple[str, List[Dict], Dict, Dict]:
+        """Parse Gemini's text response into structured format."""
+        try:
+            # For now, use the entire response as the formatted response
+            formatted_response = response_text.strip()
+            
+            # Extract structured results from the actual data
+            structured_results = results_data.get("data", [])
+            
+            # Create basic summary
+            summary = {
+                "total_records": results_data.get("row_count", 0),
+                "has_data": results_data.get("has_data", False)
+            }
+            
+            # Create basic metadata
+            metadata = {
+                "query_type": "natural_language",
+                "data_source": "database",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            return formatted_response, structured_results, summary, metadata
+            
+        except Exception as e:
+            logger.error(f"Error parsing Gemini response: {e}")
+            # Fallback
+            return response_text, results_data.get("data", []), {}, {}
+    
+    def _create_response_prompt(self, question: str, results_data: Dict[str, Any], sql_query: str = None) -> str:
+        """Create a direct response formatting prompt for Gemini."""
+        return f"""You are a helpful data analyst assistant. Format the database query results into a clear, natural language response.
+
+ORIGINAL USER QUESTION: {question}
+
+QUERY RESULTS:
+- Total records found: {results_data.get('row_count', 0)}
+- Has data: {results_data.get('has_data', False)}
+
+DATA SUMMARY:
+{json.dumps(results_data.get('data_summary', {}), indent=2, default=str, ensure_ascii=False)}
+
+ACTUAL DATA (first 10 records):
+{json.dumps(results_data.get('data', [])[:10], indent=2, default=str, ensure_ascii=False)}
+
+RESPONSE GUIDELINES:
+1. Provide a direct answer to the user's question
+2. Include relevant numbers and insights from the data
+3. If no data found, explain what that means in context
+4. Keep the response conversational and helpful
+5. Highlight interesting patterns or trends if present
+6. Use specific numbers when available
+7. Keep response concise but informative
+8. IMPORTANT: If the data shows time_spent or total_time values, these are in MINUTES, not hours
+9. For time-related queries, always specify the unit (minutes, hours, etc.)
+
+Generate a natural language response:"""
+
     def get_agent_info(self) -> Dict[str, Any]:
         """Get information about the response formatting agent."""
         return {
