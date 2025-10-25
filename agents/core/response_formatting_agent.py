@@ -11,6 +11,7 @@ from datetime import datetime
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser, PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
+from langsmith import traceable
 import json
 
 from agents.core.prompt_manager import PromptManager
@@ -60,6 +61,7 @@ class ResponseFormattingAgent:
             logger.error(f"Failed to setup Response Formatting LLM: {e}")
             raise
     
+    @traceable(name="response_formatting", project_name="web-activity-agent-system")
     def format_response(self, question: str, query_results: Dict[str, Any], sql_query: str = None) -> Dict[str, Any]:
         """Format query results into a structured JSON response.
         

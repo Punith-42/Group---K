@@ -15,6 +15,7 @@ from app import app
 # Import agent components
 from backend.api.agent_endpoints import agent_bp, init_agent
 from config import Config
+from agents.langsmith_config import setup_langsmith_tracing
 
 # Load environment variables
 load_dotenv()
@@ -37,6 +38,9 @@ def setup_agent():
         
         # Get model name (optional, defaults to gpt-3.5-turbo)
         model_name = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+        
+        # Initialize LangSmith tracing
+        langsmith_client = setup_langsmith_tracing()
         
         # Initialize agent
         init_agent(openai_api_key, model_name)
