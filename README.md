@@ -1,38 +1,49 @@
-# Web Activity Tracker with LLM Agent System
+# Web Activity Agent System
 
-A Flask-based web application that combines traditional web activity tracking with an intelligent LLM-powered agent system. Users can ask natural language questions about their data and get intelligent responses.
+An intelligent multi-agent system that converts natural language questions into SQL queries and provides insightful responses about web activity and GitHub data. Built with Google Gemini 2.5 Pro, MySQL, Flask/FastAPI, and Streamlit.
+
+**📚 For comprehensive documentation, see [DOCUMENTATION.md](DOCUMENTATION.md)**
 
 ## Features
 
-- **MySQL Database**: Simple data storage with proper indexing
-- **Flask REST API**: Clean and well-documented API endpoints
-- **LLM Agent System**: Natural language to SQL query generation
-- **Security Guards**: Multi-layer security for query validation
-- **Jinja2 Templates**: Flexible prompt management system
-- **HuggingFace Integration**: Powered by HuggingFace LLM models
-- **Local Configuration**: Simple environment-based configuration
+- **Multi-Agent Architecture**: Specialized agents for schema awareness, SQL generation, query execution, and response formatting
+- **Google Gemini 2.5 Pro**: Powered by Google's advanced language model
+- **MySQL Database**: Robust data storage with proper indexing
+- **Flask + FastAPI**: Dual backend with REST API and Swagger UI
+- **Streamlit Frontend**: Interactive chatbot interface with dark mode
+- **Security Guards**: Multi-layer security for query validation and response sanitization
+- **Database Schema Awareness**: Dynamic schema discovery and context injection
+- **Data Visualization**: Automatic chart generation (bar charts, line charts)
+- **LangSmith Tracing**: Observability and debugging support
+- **Read-Only Database**: Secure, read-only data access
 
 ## Architecture
 
+### Multi-Agent System
+
 ```
-User Question → LLM Agent → SQL Query → Database → Results → LLM → Natural Response
+User Question → SchemaAwarenessAgent → SQLGenerationAgent → QueryExecutionAgent → ResponseFormattingAgent → Natural Response
 ```
 
 ### Core Components
 
-- **Prompt Manager**: Handles Jinja2 template rendering
-- **Security Guards**: Validates SQL queries and responses
-- **LLM Agent**: Processes natural language and generates SQL
-- **Database Manager**: Safe database operations
-- **API Endpoints**: RESTful interface for agent interaction
+- **LLMDatabaseAgent**: Main orchestrator managing agent flow
+- **SchemaAwarenessAgent**: Discovers database structure and sample data
+- **SQLGenerationAgent**: Converts natural language to SQL using Gemini
+- **QueryExecutionAgent**: Safely executes SQL queries on MySQL
+- **ResponseFormattingAgent**: Converts results to natural language
+- **Security Guards**: Query validation and response sanitization
+- **Database Manager**: Safe database operations with connection pooling
+- **API Endpoints**: REST API (Flask/FastAPI) for agent interaction
+- **Streamlit UI**: Interactive chatbot with visualizations
 
 ## Quick Start
 
 ### Prerequisites
 
-- Python 3.8+
-- MySQL 8.0+ or MariaDB 10.3+
-- HuggingFace API token
+- Python 3.13+
+- MySQL 8.0+
+- Google Gemini API key
 - pip (Python package manager)
 
 ### Installation
@@ -65,12 +76,23 @@ User Question → LLM Agent → SQL Query → Database → Results → LLM → N
    python setup_database.py
    ```
 
-6. **Run the application**
+6. **Start the backend server**
    ```bash
-   python main.py
+   python main.py  # Flask on port 5001
+   # OR
+   python start_fastapi.py  # FastAPI on port 8000 with Swagger UI
    ```
 
-The API will be available at `http://127.0.0.1:5000`
+7. **Start the frontend (in a new terminal)**
+   ```bash
+   python streamlit_app.py  # Streamlit on port 8501
+   # Or: streamlit run streamlit_app.py
+   ```
+
+**Access Points**:
+- Flask API: `http://localhost:5001`
+- FastAPI + Swagger: `http://localhost:8000/docs`
+- Streamlit UI: `http://localhost:8501`
 
 ## Configuration
 
@@ -81,21 +103,24 @@ Create a `.env` file with the following variables:
 ```env
 # Database Configuration
 DB_HOST=localhost
-DB_NAME=web_activity_db
+DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_password
-DB_PORT=3306
+DB_NAME=web_activity_db
 
-# Flask Configuration
-SECRET_KEY=local-development-key
+# Google Gemini API
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=models/gemini-2.5-pro
 
-# HuggingFace LLM Configuration
-HUGGINGFACE_TOKEN_API=your_huggingface_token
-HUGGINGFACE_MODEL=openai/gpt-oss-120b
+# LangSmith Configuration (Optional)
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
+LANGCHAIN_API_KEY=your_langsmith_api_key
+LANGCHAIN_PROJECT=web-activity-agent
 
-# GitHub API Configuration (optional)
-GITHUB_TOKEN=your_github_token
-GITHUB_USERNAME=your_github_username
+# Application Configuration
+API_PORT=5001
+DEBUG=true
 ```
 
 ## API Endpoints
@@ -275,6 +300,61 @@ curl http://127.0.0.1:5000/api/agent/info
 curl http://127.0.0.1:5000/api/agent/examples
 ```
 
+## Quick Reference
+
+### Running the System
+
+```bash
+# Terminal 1: Backend
+python main.py
+
+# Terminal 2: Frontend
+python streamlit_app.py
+```
+
+### Example Questions
+
+1. "How much time did I spend on YouTube today?"
+2. "Show me my most active GitHub repositories this week."
+3. "What are my top 5 visited websites?"
+4. "Compare my GitHub activity vs web browsing time."
+5. "How much time did I spend on social media this month?"
+
+### File Structure
+
+```
+Group---K/
+├── main.py                       # Flask backend (port 5001)
+├── start_fastapi.py              # FastAPI backend (port 8000)
+├── streamlit_app.py              # Streamlit frontend (port 8501)
+├── requirements.txt              # Python dependencies
+├── env.example                   # Environment template
+├── DOCUMENTATION.md              # Comprehensive documentation
+├── agents/
+│   ├── core/                    # Agent implementations
+│   │   ├── llm_agent.py        # Main orchestrator
+│   │   ├── schema_agent.py    # Schema discovery
+│   │   ├── sql_agent.py        # SQL generation
+│   │   ├── query_execution_agent.py  # Query execution
+│   │   └── response_formatting_agent.py  # Response formatting
+│   ├── guards/                  # Security guards
+│   │   └── security_guards.py  # Query & response validation
+│   └── prompts/                # Jinja2 templates
+├── backend/
+│   ├── api/
+│   │   └── agent_endpoints.py  # API endpoints
+│   └── database/
+│       └── db_manager.py       # Database operations
+└── venv/                        # Virtual environment
+```
+
 ## Support
 
-For issues and questions, please create an issue in the repository.
+For issues and questions:
+- 📖 See [DOCUMENTATION.md](DOCUMENTATION.md) for comprehensive guide
+- 🐛 Create an issue on GitHub
+- 📧 Email: support@example.com
+
+## License
+
+MIT License

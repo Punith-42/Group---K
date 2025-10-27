@@ -76,6 +76,10 @@ class ResponseFormattingAgent:
         try:
             logger.info(f"Formatting response for question: {question}")
             
+            # Check if this is a modification request
+            if query_results.get("is_modification_request", False):
+                return self._format_modification_response(question, query_results)
+            
             # Extract relevant information from query results
             results_data = self._extract_results_data(query_results)
             
@@ -201,6 +205,71 @@ class ResponseFormattingAgent:
         except Exception as e:
             logger.error(f"Error formatting empty results response: {e}")
             return "I don't see any data matching your question."
+    
+    def _format_modification_response(self, question: str, query_results: Dict[str, Any]) -> Dict[str, Any]:
+        """Format a response for modification requests that can't be executed.
+        
+        Args:
+            question: Original user question
+            query_results: Query results with modification flag
+            
+        Returns:
+            Dictionary containing modification response
+        """
+        try:
+            logger.info(f"Formatting modification response for: {question}")
+            
+            # Create a polite response explaining we can't modify data
+            modification_reason = query_results.get("modification_reason", "Data modification detected")
+            
+            # Generate a helpful response using LLM
+            prompt_text = f"""You are a helpful database assistant. A user asked: "{question}"
+
+The user's request involves modifying or updating data in the database, but this system is designed for READ-ONLY operations only. 
+
+Please provide a polite, helpful response that:
+1. Acknowledges their request
+2. Explains that this is a read-only system
+3. Suggests alternative ways to get the information they need
+4. Remains friendly and helpful
+
+Do not mention technical details about SQL or security. Keep it conversational and helpful.
+
+Response:"""
+
+            try:
+                response = self.model.invoke(prompt_text)
+                formatted_response = response.content.strip()
+            except Exception as e:
+                logger.error(f"Failed to generate modification response: {e}")
+                formatted_response = f"I understand you'd like to modify your data, but I can only help you view and analyze your existing information. I can show you your current data and help you understand patterns, but I cannot make changes to the database. Is there something specific you'd like to know about your current data?"
+            
+            # Sanitize response
+            formatted_response = self.response_guard.sanitize_response(formatted_response)
+            
+            return {
+                "success": True,
+                "response": formatted_response,
+                "results": [],  # No data results for modification requests
+                "sql_query": query_results.get("query", ""),
+                "timestamp": datetime.now().isoformat(),
+                "user_id": query_results.get("user_id", 0),
+                "agents_used": ["SQL Generation", "Query Execution", "Response Formatting"],
+                "is_modification_request": True
+            }
+            
+        except Exception as e:
+            logger.error(f"Error formatting modification response: {e}")
+            return {
+                "success": True,
+                "response": "I understand you'd like to modify your data, but I can only help you view and analyze your existing information. I can show you your current data and help you understand patterns, but I cannot make changes to the database.",
+                "results": [],
+                "sql_query": query_results.get("query", ""),
+                "timestamp": datetime.now().isoformat(),
+                "user_id": query_results.get("user_id", 0),
+                "agents_used": ["SQL Generation", "Query Execution", "Response Formatting"],
+                "is_modification_request": True
+            }
     
     def _extract_results_data(self, query_results: Dict[str, Any]) -> Dict[str, Any]:
         """Extract relevant data from query results for formatting.

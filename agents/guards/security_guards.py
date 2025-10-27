@@ -5,7 +5,7 @@ Provides multiple layers of security for SQL query validation and execution.
 
 import re
 import logging
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,19 @@ class QuerySecurityGuard:
             'DROP', 'DELETE', 'UPDATE', 'INSERT', 'ALTER', 'CREATE',
             'TRUNCATE', 'EXEC', 'EXECUTE', 'INFORMATION_SCHEMA',
             'SYSTEM', 'ADMIN', 'GRANT', 'REVOKE', 'SHUTDOWN'
+        ]
+        
+        # Data modification patterns to block (even in SELECT queries)
+        self.modification_patterns = [
+            r'\+\s*\d+',  # Addition operations like + 1, + 5
+            r'(?<![\d\'])\-\s*\d+(?![\d\'])',   # Subtraction operations like - 1, - 5 (not in dates)
+            r'\*\s*\d+',  # Multiplication operations like * 2, * 3
+            r'/\s*\d+',   # Division operations like / 2, / 3
+            r'SET\s+',    # SET operations
+            r'INCREMENT', # INCREMENT operations
+            r'DECREMENT', # DECREMENT operations
+            r'MODIFY',    # MODIFY operations
+            r'CHANGE',    # CHANGE operations
         ]
         
         # Allowed SQL keywords (including UNION for multi-table queries)
@@ -69,6 +82,12 @@ class QuerySecurityGuard:
             dangerous_found = self._check_dangerous_keywords(sql_upper)
             if dangerous_found:
                 return False, f"Dangerous keyword detected: {dangerous_found}"
+            
+            # Check for data modification patterns
+            modification_found = self._check_modification_patterns(sql_query)
+            if modification_found:
+                # Instead of blocking, mark as modification request
+                return True, f"MODIFICATION_REQUEST:{modification_found}"
             
             # Check for user_id filtering requirement
             if not self._check_user_id_filtering(sql_query, user_id):
@@ -136,6 +155,46 @@ class QuerySecurityGuard:
                 return True
         
         return False
+    
+    def _check_modification_patterns(self, sql_query: str) -> Optional[str]:
+        """Check for data modification patterns in the query.
+        
+        Args:
+            sql_query: SQL query to check
+            
+        Returns:
+            Description of modification pattern found, or None if safe
+        """
+        try:
+            sql_upper = sql_query.upper()
+            
+            # Check for modification patterns
+            for pattern in self.modification_patterns:
+                if re.search(pattern, sql_upper, re.IGNORECASE):
+                    if pattern == r'\+\s*\d+':
+                        return "Addition operation detected (e.g., + 1, + 5)"
+                    elif pattern == r'-\s*\d+':
+                        return "Subtraction operation detected (e.g., - 1, - 5)"
+                    elif pattern == r'\*\s*\d+':
+                        return "Multiplication operation detected (e.g., * 2, * 3)"
+                    elif pattern == r'/\s*\d+':
+                        return "Division operation detected (e.g., / 2, / 3)"
+                    elif pattern == r'SET\s+':
+                        return "SET operation detected"
+                    elif pattern == r'INCREMENT':
+                        return "INCREMENT operation detected"
+                    elif pattern == r'DECREMENT':
+                        return "DECREMENT operation detected"
+                    elif pattern == r'MODIFY':
+                        return "MODIFY operation detected"
+                    elif pattern == r'CHANGE':
+                        return "CHANGE operation detected"
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error checking modification patterns: {e}")
+            return f"Modification pattern check error: {str(e)}"
     
     def _check_multiple_statements(self, sql_query: str) -> bool:
         """Check for multiple SQL statements."""

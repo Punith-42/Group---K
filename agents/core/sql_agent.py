@@ -128,15 +128,19 @@ class SQLGenerationAgent:
 
 {schema_info}
 
-CRITICAL SECURITY RULES:
+CRITICAL SECURITY RULES - READ ONLY DATABASE:
 1. ALWAYS include "user_id = %s" in WHERE clause for security (use %s placeholder, NOT actual user_id value)
-2. ONLY use SELECT queries - no INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE
-3. Use proper MySQL syntax
-4. Return ONLY the SQL query, no explanations or markdown
-5. Use parameterized queries with %s for user_id placeholder
-6. For date-related queries, use proper date functions
+2. ONLY use SELECT queries - NO INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE
+3. NEVER modify data - NO arithmetic operations like +1, -1, *2, /2 in SELECT statements
+4. NEVER use SET, INCREMENT, DECREMENT, MODIFY, CHANGE operations
+5. ONLY FETCH existing data - do NOT calculate new values or modify existing values
+6. Use proper MySQL syntax for READ-ONLY operations
+7. Return ONLY the SQL query, no explanations or markdown
+8. Use parameterized queries with %s for user_id placeholder
+9. For date-related queries, use proper date functions
 
 IMPORTANT: Use %s as placeholder for user_id, NOT the actual number. Example: WHERE user_id = %s
+FORBIDDEN: Do NOT generate queries that modify data like "SUM(commit_count) + 1" - only fetch existing data
 
 COMMON PATTERNS:
 - "today" = DATE(activity_date) = CURDATE()
@@ -166,15 +170,19 @@ Generate the SQL query:"""
 
 {schema_info}
 
-CRITICAL SECURITY RULES:
+CRITICAL SECURITY RULES - READ ONLY DATABASE:
 1. ALWAYS include "user_id = %s" in WHERE clause for security (use %s placeholder, NOT actual user_id value)
-2. ONLY use SELECT queries - no INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE
-3. Use proper MySQL syntax
-4. Return ONLY the SQL query, no explanations or markdown
-5. Use parameterized queries with %s for user_id placeholder
-6. For date-related queries, use proper date functions
+2. ONLY use SELECT queries - NO INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE
+3. NEVER modify data - NO arithmetic operations like +1, -1, *2, /2 in SELECT statements
+4. NEVER use SET, INCREMENT, DECREMENT, MODIFY, CHANGE operations
+5. ONLY FETCH existing data - do NOT calculate new values or modify existing values
+6. Use proper MySQL syntax for READ-ONLY operations
+7. Return ONLY the SQL query, no explanations or markdown
+8. Use parameterized queries with %s for user_id placeholder
+9. For date-related queries, use proper date functions
 
 IMPORTANT: Use %s as placeholder for user_id, NOT the actual number. Example: WHERE user_id = %s
+FORBIDDEN: Do NOT generate queries that modify data like "SUM(commit_count) + 1" - only fetch existing data
 
 COMMON PATTERNS:
 - "today" = DATE(activity_date) = CURDATE()

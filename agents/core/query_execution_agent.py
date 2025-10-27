@@ -5,6 +5,7 @@ Specialized agent for safely executing SQL queries and handling database operati
 
 import json
 import logging
+import re
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 
@@ -46,6 +47,22 @@ class QueryExecutionAgent:
                     "query": sql_query,
                     "user_id": user_id,
                     "timestamp": datetime.now().isoformat()
+                }
+            
+            # Step 1.5: Check for modification requests (handle gracefully)
+            if reason and reason.startswith("MODIFICATION_REQUEST:"):
+                modification_reason = reason.replace("MODIFICATION_REQUEST:", "")
+                logger.info(f"Modification request detected: {modification_reason}")
+                return {
+                    "success": True,  # Return success but with modification flag
+                    "is_modification_request": True,
+                    "modification_reason": modification_reason,
+                    "query": sql_query,
+                    "user_id": user_id,
+                    "timestamp": datetime.now().isoformat(),
+                    "results": [],  # No actual data results
+                    "row_count": 0,
+                    "columns": []
                 }
             
             # Step 2: Prepare query parameters
@@ -249,6 +266,47 @@ class QueryExecutionAgent:
         params = (user_id,) * placeholder_count
         
         return safe_query, params
+    
+    def _check_for_data_modification(self, sql_query: str) -> Optional[str]:
+        """Check if the query attempts to modify data.
+        
+        Args:
+            sql_query: SQL query to check
+            
+        Returns:
+            Description of modification attempt, or None if safe
+        """
+        try:
+            sql_upper = sql_query.upper()
+            
+            # Check for arithmetic operations that modify data
+            modification_patterns = [
+                (r'\+\s*\d+', "Addition operation detected (e.g., + 1, + 5)"),
+                (r'(?<![\d\'])\-\s*\d+(?![\d\'])', "Subtraction operation detected (e.g., - 1, - 5)"),
+                (r'\*\s*\d+', "Multiplication operation detected (e.g., * 2, * 3)"),
+                (r'/\s*\d+', "Division operation detected (e.g., / 2, / 3)"),
+                (r'SET\s+', "SET operation detected"),
+                (r'INCREMENT', "INCREMENT operation detected"),
+                (r'DECREMENT', "DECREMENT operation detected"),
+                (r'MODIFY', "MODIFY operation detected"),
+                (r'CHANGE', "CHANGE operation detected"),
+            ]
+            
+            for pattern, description in modification_patterns:
+                if re.search(pattern, sql_upper, re.IGNORECASE):
+                    return description
+            
+            # Check for specific problematic patterns (arithmetic operations on aggregated data)
+            if 'SUM(' in sql_upper:
+                # Check if there are arithmetic operations outside of date functions
+                if re.search(r'SUM\([^)]+\)\s*[+\-*/]\s*\d+', sql_upper):
+                    return "Arithmetic operations on aggregated data detected - this modifies data"
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error checking for data modification: {e}")
+            return f"Data modification check error: {str(e)}"
     
     def _process_query_results(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Process query results for better presentation.
